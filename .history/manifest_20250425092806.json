@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tree Style History Viewer",
-  "version": "1.2",
+  "version": "1.1",
   "description": "Displays Browse history in a tree structure.",
   "permissions": [
     "history",

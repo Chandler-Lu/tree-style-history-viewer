@@ -14,13 +14,14 @@ const refreshButton = document.getElementById("refresh-button");
 const loadingDiv = document.getElementById("loading");
 const filterDuplicatesCheckbox = document.getElementById("filter-duplicates");
 const searchInput = document.getElementById("search-input");
+const maxResultsInput = document.getElementById('max-results');
 
 // --- State Variable ---
 let currentFullTree = []; // Stores the latest fetched & processed (but not search-filtered) tree root nodes
 
 // --- Constants ---
 const BASE_MAX_RESULTS = 500;
-const RESULTS_PER_DAY = 500;
+const RESULTS_PER_DAY = 250;
 const MAX_RESULTS_CAP = 20000;
 
 // --- Utility Functions ---
@@ -376,83 +377,96 @@ if (searchInput) {
 }
 
 // --- Initial Load & Litepicker Setup ---
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener('DOMContentLoaded', () => {
   // Function to format date as YYYY-MM-DD using local time
   const formatDateLocal = (date) => {
-    if (!date) return "";
-    // Ensure date is a JS Date object
-    const d = date instanceof Date ? date : date.toJSDate();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+      if (!date) return '';
+      // Ensure date is a JS Date object
+      const d = (date instanceof Date) ? date : date.toJSDate();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
   };
 
+  // **初始化 Litepicker**
   const picker = new Litepicker({
-    element: document.getElementById("datepicker-container"),
-    inlineMode: true,
-    singleMode: false,
-    numberOfMonths: 1,
-    numberOfColumns: 1,
-    format: "YYYY-MM-DD",
-    showTooltip: true,
-    autoApply: true,
-    startDate: new Date(new Date().setDate(new Date().getDate() - 1)), // Yesterday
-    endDate: new Date(), // Today
-    setup: (picker) => {
-      picker.on("selected", (date1, date2) => {
-        if (date1 && date2) {
-          // --- 1. Format dates and update hidden inputs ---
-          const startDateString = formatDateLocal(date1);
-          const endDateString = formatDateLocal(date2);
-          startDateInput.value = startDateString;
-          endDateInput.value = endDateString;
+      element: document.getElementById('datepicker-container'),
+      inlineMode: true,
+      singleMode: false,
+      numberOfMonths: 1,
+      numberOfColumns: 1,
+      format: 'YYYY-MM-DD',
+      showTooltip: true,
+      autoApply: true,
+      startDate: new Date(new Date().setDate(new Date().getDate() - 1)), // Yesterday
+      endDate: new Date(),        // Today
+      setup: (picker) => {
+          picker.on('selected', (date1, date2) => {
+              if (date1 && date2) {
+                  // --- 1. Format dates and update hidden inputs ---
+                  const startDateString = formatDateLocal(date1);
+                  const endDateString = formatDateLocal(date2);
+                  startDateInput.value = startDateString;
+                  endDateInput.value = endDateString;
+                  console.log('[DEBUG] Set Input Dates:', startDateInput.value, endDateInput.value);
 
-          // --- 2. Calculate date range duration ---
-          const d1 = date1.toJSDate();
-          const d2 = date2.toJSDate();
-          d1.setHours(0, 0, 0, 0);
-          d2.setHours(0, 0, 0, 0);
-          const diffTime = Math.abs(d2.getTime() - d1.getTime());
-          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                  // --- 2. Calculate date range duration ---
+                  const d1 = date1.toJSDate();
+                  const d2 = date2.toJSDate();
+                  d1.setHours(0, 0, 0, 0); // Normalize to start of day
+                  d2.setHours(0, 0, 0, 0); // Normalize to start of day
+                  // getTime() returns milliseconds since epoch
+                  const diffTime = Math.abs(d2.getTime() - d1.getTime());
+                  // Calculate difference in days (+1 because selecting same day is 1 day range)
+                  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                  console.log(`[DEBUG] Date range duration: ${diffDays} days`);
 
-          // --- 3. Calculate and update Max Results ---
-          let suggestedMax = BASE_MAX_RESULTS + Math.max(0, diffDays - 1) * RESULTS_PER_DAY;
-          suggestedMax = Math.min(suggestedMax, MAX_RESULTS_CAP);
-          suggestedMax = Math.max(suggestedMax, BASE_MAX_RESULTS);
-          suggestedMax = Math.round(suggestedMax);
+                  // --- 3. Calculate and update Max Results ---
+                  // Start with base, add extra per day beyond the first day
+                  let suggestedMax = BASE_MAX_RESULTS + Math.max(0, diffDays - 1) * RESULTS_PER_DAY;
+                  // Apply the upper cap
+                  suggestedMax = Math.min(suggestedMax, MAX_RESULTS_CAP);
+                  // Ensure it doesn't go below the base (for 1 day or error cases)
+                  suggestedMax = Math.max(suggestedMax, BASE_MAX_RESULTS);
+                  // Ensure it's an integer
+                  suggestedMax = Math.round(suggestedMax);
 
-          // Update the input field value
-          if (maxResultsInput) {
-            maxResultsInput.value = suggestedMax;
-          }
-          fetchAndBuildTree();
-        }
-      });
-    },
+                  // Update the input field value
+                  if (maxResultsInput) {
+                      maxResultsInput.value = suggestedMax;
+                      console.log(`[DEBUG] Set Max Results Input to: ${suggestedMax}`);
+                  } else {
+                      console.warn("Max results input not found");
+                  }
+
+                  // --- 4. Trigger history fetch ---
+                  // fetchAndBuildTree will now read the updated maxResultsInput.value
+                  fetchAndBuildTree();
+              }
+          });
+      }
   });
 
   // --- Initial Setup on Load ---
   // Set initial hidden input dates based on Litepicker defaults
-  const initialStartDate = picker.getStartDate()
-    ? picker.getStartDate().toJSDate()
-    : new Date(new Date().setDate(new Date().getDate() - 1));
+  const initialStartDate = picker.getStartDate() ? picker.getStartDate().toJSDate() : new Date(new Date().setDate(new Date().getDate() - 1));
   const initialEndDate = picker.getEndDate() ? picker.getEndDate().toJSDate() : new Date();
   startDateInput.value = formatDateLocal(initialStartDate);
   endDateInput.value = formatDateLocal(initialEndDate);
 
   // Calculate and set initial Max Results based on the default date range
-  initialStartDate.setHours(0, 0, 0, 0);
-  initialEndDate.setHours(0, 0, 0, 0);
-  const initialDiffTime = Math.abs(initialEndDate.getTime() - initialStartDate.getTime());
-  const initialDiffDays = Math.round(initialDiffTime / (1000 * 60 * 60 * 24)) + 1;
-  let initialMax = BASE_MAX_RESULTS + Math.max(0, initialDiffDays - 1) * RESULTS_PER_DAY;
-  initialMax = Math.min(initialMax, MAX_RESULTS_CAP);
-  initialMax = Math.max(initialMax, BASE_MAX_RESULTS);
-  if (maxResultsInput) {
-    maxResultsInput.value = Math.round(initialMax);
-    console.log(`[DEBUG] Initial Max Results set to: ${maxResultsInput.value}`);
-  }
+   initialStartDate.setHours(0,0,0,0);
+   initialEndDate.setHours(0,0,0,0);
+   const initialDiffTime = Math.abs(initialEndDate.getTime() - initialStartDate.getTime());
+   const initialDiffDays = Math.round(initialDiffTime / (1000 * 60 * 60 * 24)) + 1;
+   let initialMax = BASE_MAX_RESULTS + Math.max(0, initialDiffDays - 1) * RESULTS_PER_DAY;
+   initialMax = Math.min(initialMax, MAX_RESULTS_CAP);
+   initialMax = Math.max(initialMax, BASE_MAX_RESULTS);
+   if (maxResultsInput) {
+        maxResultsInput.value = Math.round(initialMax);
+        console.log(`[DEBUG] Initial Max Results set to: ${maxResultsInput.value}`);
+   }
 
-  fetchAndBuildTree();
+  fetchAndBuildTree(); // Initial fetch uses calculated initial max results
 });

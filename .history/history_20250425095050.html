@@ -18,13 +18,19 @@
                 <label for="end-date">End Date: </label>
                 <input type="date" id="end-date">
                 <label for="max-results">Max Results: </label>
-                <input type="number" id="max-results">
+                <input type="number" id="max-results" value="1000" min="10">
                 <button id="refresh-button">Reload</button>
                 <label for="search-input" style="margin-left: 0px;">Search: </label>
                 <input type="text" id="search-input" placeholder="Filter by title or URL..." style="width: 250px;">
                 <span class="checkbox-group">
                     <input type="checkbox" id="filter-duplicates" checked>
                     <label for="filter-duplicates" style="margin: 0;">Hide consecutive duplicates</label>
+                    <input type="checkbox" id="level-optimize" checked>
+                    <label for="level-optimize">Limit initial depth (15 levels)</label>
+                </span>
+                <span class="checkbox-group">
+                    <input type="checkbox" id="level-optimize" checked>
+                    <label for="level-optimize">Limit initial depth (15 levels)</label>
                 </span>
             </div>
             <div id="loading" style="display: none;">Loading history...</div>

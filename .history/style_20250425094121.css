@@ -1,34 +1,37 @@
-html,
-body {
-  height: 100%;
+html, body {
+  height: 100%; /* 确保 html 和 body 能撑满高度 */
   margin: 0;
-  overflow: hidden;
-  font-family: sans-serif;
-  background-color: #f8f9fa;
+  overflow: hidden; /* 防止 body 出现滚动条，让子元素处理滚动 */
+  font-family: sans-serif; /* 移到 body 可能更好 */
+  background-color: #f8f9fa; /* 移到 body */
 }
 
 .container {
   display: flex;
-  height: 100vh;
+  height: 100vh; /* **** 关键：让容器充满视口高度 **** */
   box-sizing: border-box;
+  /* 移除容器的 padding，移到子元素内部 */
+  /* padding: 10px; */
 }
 
-.main-history {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-  padding-right: 15px;
+.main-content {
+  flex: 1; /* 占据剩余空间 */
+  overflow-y: auto; /* **** 关键：内容超出时，此区域内部滚动 **** */
+  padding: 10px; /* 将内边距应用在这里 */
+  padding-right: 15px; /* 保留与侧边栏的间距 */
   box-sizing: border-box;
+  /* 不需要设置 height: 100%，flex item 默认会 stretch */
 }
 
 .sidebar {
-  width: 300px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  padding: 10px;
-  padding-left: 15px;
+  width: 280px; /* 固定宽度 */
+  flex-shrink: 0; /* 防止被压缩 */
+  overflow-y: auto; /* 推荐：允许侧边栏内部滚动 */
+  padding: 10px; /* 将内边距应用在这里 */
+  padding-left: 15px; /* 保留与主内容的间距 */
   border-left: 1px solid #ccc;
   box-sizing: border-box;
+  /* 不需要设置 height: 100%，flex item 默认会 stretch */
 }
 
 h1 {
@@ -52,13 +55,23 @@ h1 {
   margin-left: 0px;
 }
 
-.controls label,
-.controls input[type="number"],
-.controls input[type="text"],
-.controls button,
-.controls input[type="checkbox"] + label {
+/* .controls label {
   margin-right: 8px;
-  margin-bottom: 5px;
+  white-space: nowrap;
+} */
+
+/* .controls input,
+.controls button {
+  margin-right: 8px;
+} */
+
+.controls label,
+.controls input[type=number], /* 更新选择器 */
+.controls input[type=text],   /* 更新选择器 */
+.controls button,
+.controls input[type=checkbox] + label { /* 更新选择器 */
+     margin-right: 8px;
+     margin-bottom: 5px; /* 添加一些垂直间距 */
 }
 
 #loading {

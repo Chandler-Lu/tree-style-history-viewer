@@ -13,15 +13,10 @@ const maxResultsInput = document.getElementById("max-results");
 const refreshButton = document.getElementById("refresh-button");
 const loadingDiv = document.getElementById("loading");
 const filterDuplicatesCheckbox = document.getElementById("filter-duplicates");
-const searchInput = document.getElementById("search-input");
+const searchInput = document.getElementById("search-input"); // Added
 
 // --- State Variable ---
 let currentFullTree = []; // Stores the latest fetched & processed (but not search-filtered) tree root nodes
-
-// --- Constants ---
-const BASE_MAX_RESULTS = 500;
-const RESULTS_PER_DAY = 500;
-const MAX_RESULTS_CAP = 20000;
 
 // --- Utility Functions ---
 
@@ -377,82 +372,55 @@ if (searchInput) {
 
 // --- Initial Load & Litepicker Setup ---
 document.addEventListener("DOMContentLoaded", () => {
-  // Function to format date as YYYY-MM-DD using local time
-  const formatDateLocal = (date) => {
-    if (!date) return "";
-    // Ensure date is a JS Date object
-    const d = date instanceof Date ? date : date.toJSDate();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   const picker = new Litepicker({
     element: document.getElementById("datepicker-container"),
     inlineMode: true,
     singleMode: false,
     numberOfMonths: 1,
     numberOfColumns: 1,
-    format: "YYYY-MM-DD",
+    format: "YYYY-MM-DD", // Litepicker's display format (doesn't affect output object)
     showTooltip: true,
     autoApply: true,
-    startDate: new Date(new Date().setDate(new Date().getDate() - 1)), // Yesterday
-    endDate: new Date(), // Today
+    startDate: new Date(new Date().setDate(new Date().getDate() - 1)),
+    endDate: new Date(),
     setup: (picker) => {
       picker.on("selected", (date1, date2) => {
         if (date1 && date2) {
-          // --- 1. Format dates and update hidden inputs ---
+          const formatDateLocal = (litepickerDate) => {
+            if (!litepickerDate) return "";
+            const d = litepickerDate.toJSDate();
+            // console.log(`[DEBUG] JS Date for ${litepickerDate}:`, d);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const formatted = `${year}-${month}-${day}`;
+            // console.log(`[DEBUG] Formatted Date String:`, formatted);
+            return formatted;
+          };
+
           const startDateString = formatDateLocal(date1);
           const endDateString = formatDateLocal(date2);
+
           startDateInput.value = startDateString;
           endDateInput.value = endDateString;
+          // console.log('[DEBUG] Set Input Values:', startDateInput.value, endDateInput.value);
 
-          // --- 2. Calculate date range duration ---
-          const d1 = date1.toJSDate();
-          const d2 = date2.toJSDate();
-          d1.setHours(0, 0, 0, 0);
-          d2.setHours(0, 0, 0, 0);
-          const diffTime = Math.abs(d2.getTime() - d1.getTime());
-          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-          // --- 3. Calculate and update Max Results ---
-          let suggestedMax = BASE_MAX_RESULTS + Math.max(0, diffDays - 1) * RESULTS_PER_DAY;
-          suggestedMax = Math.min(suggestedMax, MAX_RESULTS_CAP);
-          suggestedMax = Math.max(suggestedMax, BASE_MAX_RESULTS);
-          suggestedMax = Math.round(suggestedMax);
-
-          // Update the input field value
-          if (maxResultsInput) {
-            maxResultsInput.value = suggestedMax;
-          }
           fetchAndBuildTree();
         }
       });
     },
   });
 
-  // --- Initial Setup on Load ---
-  // Set initial hidden input dates based on Litepicker defaults
-  const initialStartDate = picker.getStartDate()
-    ? picker.getStartDate().toJSDate()
-    : new Date(new Date().setDate(new Date().getDate() - 1));
-  const initialEndDate = picker.getEndDate() ? picker.getEndDate().toJSDate() : new Date();
-  startDateInput.value = formatDateLocal(initialStartDate);
-  endDateInput.value = formatDateLocal(initialEndDate);
-
-  // Calculate and set initial Max Results based on the default date range
-  initialStartDate.setHours(0, 0, 0, 0);
-  initialEndDate.setHours(0, 0, 0, 0);
-  const initialDiffTime = Math.abs(initialEndDate.getTime() - initialStartDate.getTime());
-  const initialDiffDays = Math.round(initialDiffTime / (1000 * 60 * 60 * 24)) + 1;
-  let initialMax = BASE_MAX_RESULTS + Math.max(0, initialDiffDays - 1) * RESULTS_PER_DAY;
-  initialMax = Math.min(initialMax, MAX_RESULTS_CAP);
-  initialMax = Math.max(initialMax, BASE_MAX_RESULTS);
-  if (maxResultsInput) {
-    maxResultsInput.value = Math.round(initialMax);
-    console.log(`[DEBUG] Initial Max Results set to: ${maxResultsInput.value}`);
-  }
+  const formatDateLocalInitial = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+  const today = new Date();
+  const yesterday = new Date(new Date().setDate(today.getDate() - 1));
+  if (!startDateInput.value) startDateInput.value = formatDateLocalInitial(yesterday);
+  if (!endDateInput.value) endDateInput.value = formatDateLocalInitial(today);
 
   fetchAndBuildTree();
 });

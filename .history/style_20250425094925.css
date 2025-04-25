@@ -1,5 +1,4 @@
-html,
-body {
+html, body {
   height: 100%;
   margin: 0;
   overflow: hidden;
@@ -52,13 +51,23 @@ h1 {
   margin-left: 0px;
 }
 
-.controls label,
-.controls input[type="number"],
-.controls input[type="text"],
-.controls button,
-.controls input[type="checkbox"] + label {
+/* .controls label {
   margin-right: 8px;
-  margin-bottom: 5px;
+  white-space: nowrap;
+} */
+
+/* .controls input,
+.controls button {
+  margin-right: 8px;
+} */
+
+.controls label,
+.controls input[type=number], /* 更新选择器 */
+.controls input[type=text],   /* 更新选择器 */
+.controls button,
+.controls input[type=checkbox] + label { /* 更新选择器 */
+     margin-right: 8px;
+     margin-bottom: 5px; /* 添加一些垂直间距 */
 }
 
 #loading {

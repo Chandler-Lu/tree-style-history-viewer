@@ -19,8 +19,8 @@ const searchInput = document.getElementById("search-input");
 let currentFullTree = []; // Stores the latest fetched & processed (but not search-filtered) tree root nodes
 
 // --- Constants ---
-const BASE_MAX_RESULTS = 500;
-const RESULTS_PER_DAY = 500;
+const BASE_MAX_RESULTS = 750;
+const RESULTS_PER_DAY = 250;
 const MAX_RESULTS_CAP = 20000;
 
 // --- Utility Functions ---

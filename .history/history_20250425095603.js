@@ -14,14 +14,13 @@ const refreshButton = document.getElementById("refresh-button");
 const loadingDiv = document.getElementById("loading");
 const filterDuplicatesCheckbox = document.getElementById("filter-duplicates");
 const searchInput = document.getElementById("search-input");
+const levelOptimizeCheckbox = document.getElementById("level-optimize");
 
 // --- State Variable ---
 let currentFullTree = []; // Stores the latest fetched & processed (but not search-filtered) tree root nodes
 
 // --- Constants ---
-const BASE_MAX_RESULTS = 500;
-const RESULTS_PER_DAY = 500;
-const MAX_RESULTS_CAP = 20000;
+const MAX_RENDER_DEPTH = 15; // Define the depth limit
 
 // --- Utility Functions ---
 
@@ -109,9 +108,10 @@ function renderTree(nodesToRender) {
   historyTreeDiv.innerHTML = "";
 
   if (nodesToRender && nodesToRender.length > 0) {
-    // Sort roots by time (most recent first) before rendering
     nodesToRender.sort((a, b) => b.data.visitData.visitTime - a.data.visitData.visitTime);
-    const treeHtml = createTreeHtml(nodesToRender);
+    // Pass the depth limit down to createTreeHtml
+    const depthLimit = limitDepth ? MAX_RENDER_DEPTH : 0; // 0 means no limit
+    const treeHtml = createTreeHtml(nodesToRender, depthLimit);
     historyTreeDiv.appendChild(treeHtml);
   } else {
     // Display appropriate message if nothing to render
@@ -135,9 +135,15 @@ function renderTree(nodesToRender) {
  */
 function renderFilteredTree() {
   const searchText = searchInput ? searchInput.value.trim().toLowerCase() : "";
-  console.log(`Rendering tree with search filter: "${searchText}"`);
-  const nodesToRender = filterAndCloneTree(currentFullTree, searchText);
-  renderTree(nodesToRender);
+  const limitDepth = levelOptimizeCheckbox && levelOptimizeCheckbox.checked; // Check level optimize state
+
+  // console.log(`Rendering tree with search: "${searchText}", limitDepth: ${limitDepth}`);
+
+  // Apply search filter first
+  const searchFilteredNodes = filterAndCloneTree(currentFullTree, searchText);
+
+  // Render the search-filtered tree, passing the depth limit flag
+  renderTree(searchFilteredNodes, limitDepth);
 }
 
 // --- Core History Fetching and Tree Building ---
@@ -149,7 +155,7 @@ function renderFilteredTree() {
 async function fetchAndBuildTree() {
   if (loadingDiv) loadingDiv.style.display = "block"; // Show loading indicator
   historyTreeDiv.innerHTML = ""; // Clear tree immediately
-  currentFullTree = []; // Reset the stored tree
+  currentFullTree = finalRootNodes; // finalRootNodes is built fully, without depth limit
 
   const historyPageUrl = chrome.runtime.getURL("history.html");
   const startTime = new Date(startDateInput.value).getTime();
@@ -273,34 +279,63 @@ async function fetchAndBuildTree() {
 
 /**
  * Creates the top-level UL element for the history tree.
+ * @param {Array} nodes Array of root nodes.
+ * @param {number} depthLimit Max depth to render (0 for unlimited).
+ * @returns {HTMLUListElement} The UL element containing the tree.
  */
-function createTreeHtml(nodes) {
-  const list = document.createElement("ul");
-  list.className = "history-tree-list";
-  // Nodes should be pre-sorted if needed before calling this
-  nodes.forEach((node) => {
-    list.appendChild(renderNode(node));
-  });
-  return list;
+function createTreeHtml(nodes, depthLimit) { // Added depthLimit parameter
+    const list = document.createElement('ul');
+    list.className = 'history-tree-list';
+    nodes.forEach(node => {
+        // Start rendering each root node at depth 1
+        const nodeElement = renderNode(node, 1, depthLimit); // Pass depth=1 and limit
+        if (nodeElement) { // Append only if not null (i.e., not exceeding depth limit at root level)
+            list.appendChild(nodeElement);
+        }
+    });
+    return list;
 }
 
 /**
- * Recursively renders a single node and its children.
+ * Recursively renders a single node and its children, respecting depth limit.
+ * @param {object} node The node to render.
+ * @param {number} currentDepth The current depth of this node (root is 1).
+ * @param {number} depthLimit Max depth to render (0 for unlimited).
+ * @returns {HTMLLIElement | null} The LI element or null if depth limit exceeded.
  */
-function renderNode(node) {
-  const listItem = createNodeElement(node.data);
-  if (node.children && node.children.length > 0) {
-    const childrenList = document.createElement("ul");
-    childrenList.className = "history-tree-children";
-    // Sort children by time (oldest first within parent) before rendering
-    node.children
-      .sort((a, b) => a.data.visitData.visitTime - b.data.visitData.visitTime)
-      .forEach((childNode) => {
-        childrenList.appendChild(renderNode(childNode));
-      });
-    listItem.appendChild(childrenList);
-  }
-  return listItem;
+function renderNode(node, currentDepth, depthLimit) { // Added depth parameters
+    // **** DEPTH CHECK ****
+    // If limit is active (>0) and current depth exceeds it, stop rendering this branch.
+    if (depthLimit > 0 && currentDepth > depthLimit) {
+        // Optionally, return a placeholder LI instead of null to indicate hidden items
+        // const placeholder = document.createElement('li');
+        // placeholder.textContent = '[...]';
+        // placeholder.className = 'depth-placeholder';
+        // return placeholder;
+        return null;
+    }
+    // **** END DEPTH CHECK ****
+
+    const listItem = createNodeElement(node.data); // Create the element for the node itself
+
+    if (node.children && node.children.length > 0) {
+        const childrenList = document.createElement('ul');
+        childrenList.className = 'history-tree-children';
+        node.children
+            .sort((a, b) => a.data.visitData.visitTime - b.data.visitData.visitTime)
+            .forEach(childNode => {
+                // Recursively render children, incrementing depth
+                const childElement = renderNode(childNode, currentDepth + 1, depthLimit);
+                if (childElement) { // Append child only if it wasn't null (didn't exceed depth)
+                   childrenList.appendChild(childElement);
+                }
+            });
+        // Only append the children UL if it actually contains rendered children
+        if (childrenList.hasChildNodes()) {
+             listItem.appendChild(childrenList);
+        }
+    }
+    return listItem;
 }
 
 /**
@@ -357,6 +392,7 @@ function createNodeElement(nodeData) {
 }
 
 // --- Event Listeners ---
+
 // Listeners that trigger a full data re-fetch and rebuild
 refreshButton.addEventListener("click", fetchAndBuildTree);
 // startDateInput.addEventListener("change", fetchAndBuildTree);
@@ -377,17 +413,6 @@ if (searchInput) {
 
 // --- Initial Load & Litepicker Setup ---
 document.addEventListener("DOMContentLoaded", () => {
-  // Function to format date as YYYY-MM-DD using local time
-  const formatDateLocal = (date) => {
-    if (!date) return "";
-    // Ensure date is a JS Date object
-    const d = date instanceof Date ? date : date.toJSDate();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   const picker = new Litepicker({
     element: document.getElementById("datepicker-container"),
     inlineMode: true,
@@ -397,62 +422,22 @@ document.addEventListener("DOMContentLoaded", () => {
     format: "YYYY-MM-DD",
     showTooltip: true,
     autoApply: true,
-    startDate: new Date(new Date().setDate(new Date().getDate() - 1)), // Yesterday
-    endDate: new Date(), // Today
+    startDate: new Date(new Date().setDate(new Date().getDate() - 1)),
+    endDate: new Date(),
     setup: (picker) => {
       picker.on("selected", (date1, date2) => {
         if (date1 && date2) {
-          // --- 1. Format dates and update hidden inputs ---
-          const startDateString = formatDateLocal(date1);
-          const endDateString = formatDateLocal(date2);
-          startDateInput.value = startDateString;
-          endDateInput.value = endDateString;
-
-          // --- 2. Calculate date range duration ---
-          const d1 = date1.toJSDate();
-          const d2 = date2.toJSDate();
-          d1.setHours(0, 0, 0, 0);
-          d2.setHours(0, 0, 0, 0);
-          const diffTime = Math.abs(d2.getTime() - d1.getTime());
-          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-          // --- 3. Calculate and update Max Results ---
-          let suggestedMax = BASE_MAX_RESULTS + Math.max(0, diffDays - 1) * RESULTS_PER_DAY;
-          suggestedMax = Math.min(suggestedMax, MAX_RESULTS_CAP);
-          suggestedMax = Math.max(suggestedMax, BASE_MAX_RESULTS);
-          suggestedMax = Math.round(suggestedMax);
-
-          // Update the input field value
-          if (maxResultsInput) {
-            maxResultsInput.value = suggestedMax;
-          }
+          const formatDate = (date) => date.toJSDate().toISOString().split("T")[0];
+          startDateInput.value = formatDate(date1);
+          endDateInput.value = formatDate(date2);
           fetchAndBuildTree();
         }
       });
     },
   });
 
-  // --- Initial Setup on Load ---
-  // Set initial hidden input dates based on Litepicker defaults
-  const initialStartDate = picker.getStartDate()
-    ? picker.getStartDate().toJSDate()
-    : new Date(new Date().setDate(new Date().getDate() - 1));
-  const initialEndDate = picker.getEndDate() ? picker.getEndDate().toJSDate() : new Date();
-  startDateInput.value = formatDateLocal(initialStartDate);
-  endDateInput.value = formatDateLocal(initialEndDate);
-
-  // Calculate and set initial Max Results based on the default date range
-  initialStartDate.setHours(0, 0, 0, 0);
-  initialEndDate.setHours(0, 0, 0, 0);
-  const initialDiffTime = Math.abs(initialEndDate.getTime() - initialStartDate.getTime());
-  const initialDiffDays = Math.round(initialDiffTime / (1000 * 60 * 60 * 24)) + 1;
-  let initialMax = BASE_MAX_RESULTS + Math.max(0, initialDiffDays - 1) * RESULTS_PER_DAY;
-  initialMax = Math.min(initialMax, MAX_RESULTS_CAP);
-  initialMax = Math.max(initialMax, BASE_MAX_RESULTS);
-  if (maxResultsInput) {
-    maxResultsInput.value = Math.round(initialMax);
-    console.log(`[DEBUG] Initial Max Results set to: ${maxResultsInput.value}`);
-  }
-
+  const formatDate = (date) => date.toISOString().split("T")[0];
+  if (!startDateInput.value) startDateInput.value = formatDate(new Date(new Date().setDate(new Date().getDate() - 1)));
+  if (!endDateInput.value) endDateInput.value = formatDate(new Date());
   fetchAndBuildTree();
 });

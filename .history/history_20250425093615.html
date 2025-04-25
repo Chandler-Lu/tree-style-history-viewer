@@ -18,7 +18,7 @@
                 <label for="end-date">End Date: </label>
                 <input type="date" id="end-date">
                 <label for="max-results">Max Results: </label>
-                <input type="number" id="max-results">
+                <input type="number" id="max-results" value="1000" min="10">
                 <button id="refresh-button">Reload</button>
                 <label for="search-input" style="margin-left: 0px;">Search: </label>
                 <input type="text" id="search-input" placeholder="Filter by title or URL..." style="width: 250px;">
@@ -33,6 +33,7 @@
         </div>
 
         <div class="sidebar">
+            <h3>Select Date Range</h3>
             <div id="datepicker-container" style="margin: 0 auto;"></div>
         </div>
         <script src="vendor/litepicker/litepicker.js"></script>

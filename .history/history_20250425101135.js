@@ -19,8 +19,8 @@ const searchInput = document.getElementById("search-input");
 let currentFullTree = []; // Stores the latest fetched & processed (but not search-filtered) tree root nodes
 
 // --- Constants ---
-const BASE_MAX_RESULTS = 500;
-const RESULTS_PER_DAY = 500;
+const BASE_MAX_RESULTS = 750;
+const RESULTS_PER_DAY = 250;
 const MAX_RESULTS_CAP = 20000;
 
 // --- Utility Functions ---
@@ -388,6 +388,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${year}-${month}-${day}`;
   };
 
+  // **初始化 Litepicker**
   const picker = new Litepicker({
     element: document.getElementById("datepicker-container"),
     inlineMode: true,
@@ -407,25 +408,37 @@ document.addEventListener("DOMContentLoaded", () => {
           const endDateString = formatDateLocal(date2);
           startDateInput.value = startDateString;
           endDateInput.value = endDateString;
+          // console.log("[DEBUG] Set Input Dates:", startDateInput.value, endDateInput.value);
 
           // --- 2. Calculate date range duration ---
           const d1 = date1.toJSDate();
           const d2 = date2.toJSDate();
-          d1.setHours(0, 0, 0, 0);
-          d2.setHours(0, 0, 0, 0);
+          d1.setHours(0, 0, 0, 0); // Normalize to start of day
+          d2.setHours(0, 0, 0, 0); // Normalize to start of day
+          // getTime() returns milliseconds since epoch
           const diffTime = Math.abs(d2.getTime() - d1.getTime());
+          // Calculate difference in days (+1 because selecting same day is 1 day range)
           const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+          // console.log(`[DEBUG] Date range duration: ${diffDays} days`);
 
           // --- 3. Calculate and update Max Results ---
+          // Start with base, add extra per day beyond the first day
           let suggestedMax = BASE_MAX_RESULTS + Math.max(0, diffDays - 1) * RESULTS_PER_DAY;
+          // Apply the upper cap
           suggestedMax = Math.min(suggestedMax, MAX_RESULTS_CAP);
+          // Ensure it doesn't go below the base (for 1 day or error cases)
           suggestedMax = Math.max(suggestedMax, BASE_MAX_RESULTS);
+          // Ensure it's an integer
           suggestedMax = Math.round(suggestedMax);
 
           // Update the input field value
           if (maxResultsInput) {
             maxResultsInput.value = suggestedMax;
+            // console.log(`[DEBUG] Set Max Results Input to: ${suggestedMax}`);
           }
+
+          // --- 4. Trigger history fetch ---
+          // fetchAndBuildTree will now read the updated maxResultsInput.value
           fetchAndBuildTree();
         }
       });
@@ -454,5 +467,5 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(`[DEBUG] Initial Max Results set to: ${maxResultsInput.value}`);
   }
 
-  fetchAndBuildTree();
+  fetchAndBuildTree(); // Initial fetch uses calculated initial max results
 });
