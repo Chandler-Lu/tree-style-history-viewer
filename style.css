@@ -120,7 +120,7 @@ h1 {
 
 .history-tree-list li a {
   text-decoration: none;
-  color: #007bff; /* Standard link blue */
+  color: #007bff;
 }
 
 .history-tree-list li a:hover {
@@ -131,4 +131,29 @@ h1 {
   font-size: 0.8em;
   color: #888;
   margin-left: 5px;
+}
+
+/* Style for checkboxes within history items */
+.history-tree-list li .history-item-checkbox {
+  margin-right: 6px;
+  vertical-align: middle;
+  width: 14px;
+  height: 14px;
+}
+
+.history-tree-list li .favicon,
+.history-tree-list li .timestamp,
+.history-tree-list li a,
+.history-tree-list li .transition {
+  vertical-align: middle;
+}
+
+#delete-selected-button {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#delete-selected-button:hover {
+  opacity: 0.9;
 }

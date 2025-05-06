@@ -14,6 +14,7 @@ const refreshButton = document.getElementById("refresh-button");
 const loadingDiv = document.getElementById("loading");
 const filterDuplicatesCheckbox = document.getElementById("filter-duplicates");
 const searchInput = document.getElementById("search-input");
+const deleteSelectedButton = document.getElementById("delete-selected-button");
 
 // --- State Variable ---
 let currentFullTree = []; // Stores the latest fetched & processed (but not search-filtered) tree root nodes
@@ -113,6 +114,8 @@ function renderTree(nodesToRender) {
     nodesToRender.sort((a, b) => b.data.visitData.visitTime - a.data.visitData.visitTime);
     const treeHtml = createTreeHtml(nodesToRender);
     historyTreeDiv.appendChild(treeHtml);
+    visibleCheckboxes = Array.from(historyTreeDiv.querySelectorAll(".history-item-checkbox"));
+    console.log(`Rendered tree, found ${visibleCheckboxes.length} selectable items.`);
   } else {
     // Display appropriate message if nothing to render
     const searchTextValue = searchInput ? searchInput.value.trim() : "";
@@ -307,10 +310,17 @@ function renderNode(node) {
  * Creates a single list item (<li>) element for a history entry.
  */
 function createNodeElement(nodeData) {
-  // ... (createNodeElement function remains the same as previous version) ...
   const item = nodeData.historyItem;
   const visit = nodeData.visitData;
   const listItem = document.createElement("li");
+
+  // Checkbox
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "history-item-checkbox";
+  checkbox.dataset.url = item.url;
+  checkbox.dataset.visitId = visit.visitId;
+  listItem.appendChild(checkbox);
 
   // Favicon
   const favicon = document.createElement("img");
@@ -356,6 +366,58 @@ function createNodeElement(nodeData) {
   return listItem;
 }
 
+/**
+ * Handles clicks on history item checkboxes, including Shift-click range selection.
+ */
+function handleCheckboxClick(event, clickedCheckbox) {
+  // visibleCheckboxes should be up-to-date thanks to renderTree
+  const currentIndex = visibleCheckboxes.indexOf(clickedCheckbox);
+
+  if (currentIndex === -1) {
+    console.warn("Clicked checkbox not found in visible list cache. Re-querying...");
+    // Attempt to recover by re-querying, though this indicates a potential state issue
+    visibleCheckboxes = Array.from(historyTreeDiv.querySelectorAll(".history-item-checkbox"));
+    const newIndex = visibleCheckboxes.indexOf(clickedCheckbox);
+    if (newIndex === -1) {
+      console.error("Checkbox definitely not found in DOM.");
+      return;
+    }
+    // If found after re-query, proceed but log the inconsistency
+    console.warn("Checkbox found after re-query. Proceeding, but check render logic.");
+    // Don't update lastCheckedIndex here, let the logic below handle it based on shift state
+    // We use newIndex for the rest of this function call
+    handleShiftClickLogic(event, clickedCheckbox, newIndex); // Pass index explicitly
+  } else {
+    handleShiftClickLogic(event, clickedCheckbox, currentIndex); // Use found index
+  }
+}
+
+/** Separated logic for handling shift/normal click after index is known */
+function handleShiftClickLogic(event, clickedCheckbox, currentIndex) {
+  if (event.shiftKey && lastCheckedIndex !== -1 && lastCheckedIndex < visibleCheckboxes.length) {
+    // Shift-click range selection
+    const start = Math.min(lastCheckedIndex, currentIndex);
+    const end = Math.max(lastCheckedIndex, currentIndex);
+    const targetState = clickedCheckbox.checked; // State *after* the click determines range state
+
+    console.log(`Shift-click: Setting range [${start}, ${end}] to state ${targetState}`);
+
+    for (let i = start; i <= end; i++) {
+      // Check array bounds and element existence
+      if (visibleCheckboxes[i]) {
+        visibleCheckboxes[i].checked = targetState;
+      } else {
+        console.warn(`Attempted to access checkbox at invalid index ${i} during shift-select.`);
+      }
+    }
+    // Anchor (lastCheckedIndex) doesn't change on shift-click
+  } else {
+    // Normal click or shift-click without valid anchor
+    console.log(`Normal click at index ${currentIndex}. Setting lastCheckedIndex.`);
+    lastCheckedIndex = currentIndex;
+  }
+}
+
 // --- Event Listeners ---
 // Listeners that trigger a full data re-fetch and rebuild
 refreshButton.addEventListener("click", fetchAndBuildTree);
@@ -373,6 +435,77 @@ maxResultsInput.addEventListener("input", debouncedFetch);
 if (searchInput) {
   const debouncedRender = debounce(renderFilteredTree, 300); // Shorter delay for search
   searchInput.addEventListener("input", debouncedRender);
+}
+
+// Delete Selected Button Listener
+if (deleteSelectedButton) {
+  deleteSelectedButton.addEventListener("click", async () => {
+    // 1. Find selected checkboxes within the currently rendered tree
+    const selectedCheckboxes = historyTreeDiv.querySelectorAll(".history-item-checkbox:checked");
+
+    if (selectedCheckboxes.length === 0) {
+      alert("Please select history items to delete.");
+      return;
+    }
+
+    // 2. Collect unique URLs to delete
+    const urlsToDelete = new Set();
+    selectedCheckboxes.forEach((checkbox) => {
+      if (checkbox.dataset.url) {
+        urlsToDelete.add(checkbox.dataset.url);
+      }
+    });
+
+    if (urlsToDelete.size === 0) {
+      alert("Could not identify URLs for selected items.");
+      return;
+    }
+
+    // 3. **** CRITICAL: Confirm with strong warning ****
+    const urlList = Array.from(urlsToDelete)
+      .map((url) => `- ${url}`)
+      .join("\n");
+    const confirmationMessage = `WARNING!\nYou are about to delete ALL history records for the selected URL(s).`;
+
+    if (!confirm(confirmationMessage)) {
+      console.log("Deletion cancelled by user.");
+      return;
+    }
+
+    // 4. Proceed with deletion
+    console.log("Deleting URLs:", urlsToDelete);
+    loadingDiv.style.display = "block"; // Show loading indicator during deletion
+
+    let deletionErrors = 0;
+    const deletionPromises = [];
+
+    urlsToDelete.forEach((url) => {
+      // Wrap the chrome API call in a promise for Promise.all
+      const promise = new Promise((resolve, reject) => {
+        chrome.history.deleteUrl({ url: url }, () => {
+          if (chrome.runtime.lastError) {
+            console.error(`Error deleting URL ${url}:`, chrome.runtime.lastError.message);
+            reject(chrome.runtime.lastError);
+          } else {
+            console.log(`Successfully requested deletion for ${url}`);
+            resolve();
+          }
+        });
+      });
+      deletionPromises.push(promise);
+    });
+
+    // Wait for all deletion requests to be processed (success or fail)
+    const results = await Promise.allSettled(deletionPromises);
+
+    results.forEach((result) => {
+      if (result.status === "rejected") {
+        deletionErrors++;
+      }
+    });
+
+    await fetchAndBuildTree();
+  });
 }
 
 // --- Initial Load & Litepicker Setup ---
@@ -431,6 +564,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     },
   });
+
+  if (historyTreeDiv) {
+    historyTreeDiv.addEventListener("click", (event) => {
+      if (event.target && event.target.matches(".history-item-checkbox")) {
+        handleCheckboxClick(event, event.target); // Use the dedicated handler
+      }
+    });
+  }
 
   // --- Initial Setup on Load ---
   // Set initial hidden input dates based on Litepicker defaults
