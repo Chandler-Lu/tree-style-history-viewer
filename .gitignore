@@ -1,0 +1,53 @@
+# === 操作系统特定文件 ===
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+__MACOSX
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# === VSCode 配置文件===
+.vscode/*
+.history/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+
+# === 日志文件和数据库文件 ===
+*.log
+*.sql
+*.sqlite
+*.db
+*.db3
+*.sublime-workspace
+*.pid
+
+# === 其他常见文件/目录 ===
+.idea/
+*.iml
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+*.rej
+
+# === Git 文件冲突时生成的临时文件 ===
+*.orig
+
+# === 临时打包/测试文件 ===
+coverage/
+test-results/
+tmp/
+logs/
