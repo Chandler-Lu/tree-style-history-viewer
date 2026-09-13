@@ -5,12 +5,16 @@ chrome.action.onClicked.addListener((tab) => {
 
   // Optional: Check if a history tab is already open and focus it
   chrome.tabs.query({ url: historyPageUrl }, (tabs) => {
+    // A URL-filtered query can be restricted by browser permissions. In that
+    // case, opening a fresh tab still gives the user a working action.
+    if (chrome.runtime.lastError || !tabs) {
+      chrome.tabs.create({ url: historyPageUrl });
+      return;
+    }
     if (tabs.length > 0) {
-      // If found, focus the first existing history tab
       chrome.tabs.update(tabs[0].id, { active: true });
       chrome.windows.update(tabs[0].windowId, { focused: true });
     } else {
-      // Otherwise, create a new tab for the history page
       chrome.tabs.create({ url: historyPageUrl });
     }
   });

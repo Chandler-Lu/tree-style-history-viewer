@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Tree Style History Viewer",
   "version": "1.1",
-  "description": "Displays Browse history in a tree structure.",
+  "description": "以树状结构查看浏览历史。View browsing history as a tree.",
   "permissions": [
     "history",
     "favicon"
@@ -13,7 +13,7 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
-    "default_title": "Open Tree History"
+    "default_title": "打开树状历史 / Open Tree History"
   },
   "background": {
     "service_worker": "background.js"
